@@ -1,0 +1,167 @@
+# =============================================================================
+# config.yaml — Central configuration for the EarlyTrend pipeline
+# =============================================================================
+# All modules import settings from here via utils/config_loader.py
+# Override any value with environment variables (see notes per section)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Spark
+# ---------------------------------------------------------------------------
+spark:
+  app_name: "TrendBeaconDetection"
+  master: "local[*]"          # Use "yarn" on a real cluster
+  executor_memory: "2g"
+  driver_memory: "2g"
+  shuffle_partitions: 8       # Lower for local dev; raise for cluster (200+)
+  log_level: "WARN"           # Options: ALL, DEBUG, INFO, WARN, ERROR, OFF
+
+# ---------------------------------------------------------------------------
+# HDFS / Storage paths
+# ---------------------------------------------------------------------------
+hdfs:
+  # Set base_uri to "file://" for local mode (no Hadoop installed)
+  # Set to "hdfs://localhost:9000" when Hadoop is running
+  base_uri: "file://"
+  paths:
+    raw:        "data/hdfs/raw"         # Raw ingested data
+    processed:  "data/hdfs/processed"   # Cleaned + normalized
+    features:   "data/hdfs/features"    # Engineered feature vectors
+    trends:     "data/hdfs/trends"      # Detected trend outputs
+    models:     "data/hdfs/models"      # Saved model artifacts
+
+# ---------------------------------------------------------------------------
+# Data Ingestion
+# ---------------------------------------------------------------------------
+ingestion:
+  # Simulated data (always available — no API keys needed)
+  simulate: true
+  sample_data_path: "data/"
+
+  # Twitter API v2 — set simulate: false to use real API
+  twitter:
+    bearer_token: "${TWITTER_BEARER_TOKEN}"   # Export as env var
+    search_query: "#AI OR #MachineLearning OR trending"
+    max_results: 100
+    lookback_hours: 24
+
+  # Reddit (PRAW)
+  reddit:
+    client_id:     "${REDDIT_CLIENT_ID}"
+    client_secret: "${REDDIT_CLIENT_SECRET}"
+    user_agent:    "TrendBeacon/1.0"
+    subreddits:    ["technology", "worldnews", "science", "politics"]
+    post_limit:    200
+
+  # News (RSS / GDELT)
+  news:
+    rss_feeds:
+      - "http://feeds.bbci.co.uk/news/rss.xml"
+      - "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    gdelt_simulate: true   # Use local GDELT sample when true
+
+# ---------------------------------------------------------------------------
+# Kafka (optional streaming)
+# ---------------------------------------------------------------------------
+kafka:
+  enabled: false
+  bootstrap_servers: "localhost:9092"
+  topics:
+    raw_tweets:   "raw-tweets"
+    raw_reddit:   "raw-reddit"
+    raw_news:     "raw-news"
+    trends_out:   "detected-trends"
+  consumer_group: "earlytrend-group"
+
+# ---------------------------------------------------------------------------
+# Processing
+# ---------------------------------------------------------------------------
+processing:
+  language: "en"
+  min_token_length: 3          # Drop tokens shorter than this
+  max_vocab_size: 10000        # Top-N keywords to track
+  processed_output_path: "file://data/hdfs/processed"
+  raw_input_paths:
+    - "file://data/hdfs/raw/source=twitter"
+    - "file://data/hdfs/raw/source=reddit"
+    - "file://data/hdfs/raw/source=news"
+  source_formats:
+    "file://data/hdfs/raw/source=twitter": "json"
+    "file://data/hdfs/raw/source=reddit": "json"
+    "file://data/hdfs/raw/source=news": "json"
+  extra_stopwords:             # Domain-specific stopwords
+    - "http"
+    - "https"
+    - "amp"
+    - "rt"
+    - "via"
+
+# ---------------------------------------------------------------------------
+# Feature Engineering / Trend Detection
+# ---------------------------------------------------------------------------
+features:
+  time_windows:                # Rolling windows for frequency count
+    - "1h"
+    - "6h"
+    - "24h"
+    - "7d"
+  frequency_windows:
+    - "1h"
+    - "6h"
+    - "24h"
+    - "7d"
+  frequency_slide_fraction: 1.0
+  features_output_path: "file://data/hdfs/features"
+  growth_rate_epsilon: 1.0     # Smoothing constant to avoid division by zero
+  anomaly_z_threshold: 2.5     # Z-score above this = anomaly / spike
+  min_frequency: 5             # Ignore keywords seen fewer times than this
+
+  # Trend classification thresholds
+  trend_labels:
+    viral_window:     "1h"
+    viral_z:          3.0      # Z-score on 1h window → VIRAL
+    emerging_window:  "24h"
+    emerging_z:       2.0      # Z-score on 24h window → EMERGING
+
+# ---------------------------------------------------------------------------
+# Prediction Models
+# ---------------------------------------------------------------------------
+models:
+  prophet:
+    forecast_periods: 24       # Forecast 24 hours ahead
+    forecast_freq: "H"         # Hourly frequency
+    top_n_keywords: 20
+    yearly_seasonality: false
+    weekly_seasonality: true
+    daily_seasonality: true
+    changepoint_prior_scale: 0.05
+
+  anomaly_detector:
+    method: "isolation_forest"  # Options: isolation_forest, zscore, iqr
+    contamination: 0.05         # Expected fraction of anomalies
+    random_state: 42
+
+  classifier:
+    model_type: "random_forest"
+    n_estimators: 100
+    test_size: 0.2
+    random_state: 42
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+dashboard:
+  title: "TrendBeacon"
+  refresh_interval_sec: 30     # Auto-refresh every N seconds
+  top_n_trends: 20             # Show top N trends on dashboard
+  chart_lookback_hours: 48     # Default chart time range
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  level: "INFO"                # Options: DEBUG, INFO, WARNING, ERROR
+  log_to_file: true
+  log_dir: "logs/"
+  max_bytes: 10485760          # 10 MB per log file
+  backup_count: 5

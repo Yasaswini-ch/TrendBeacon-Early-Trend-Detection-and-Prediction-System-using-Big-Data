@@ -1,0 +1,71 @@
+# =============================================================================
+# requirements.txt — EarlyTrend Pipeline Dependencies
+# =============================================================================
+# Install with: pip install -r requirements.txt
+# Python 3.9+ recommended
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Core Big Data
+# ---------------------------------------------------------------------------
+pyspark==3.5.0              # Apache Spark Python API
+pyarrow==14.0.2             # Columnar format — required by PySpark for Pandas UDFs
+pandas==2.1.4               # Used for feature engineering + Prophet interface
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+pyyaml==6.0.1               # YAML config loading
+python-dotenv==1.0.0        # Load .env files for API keys (optional)
+
+# ---------------------------------------------------------------------------
+# Data Ingestion
+# ---------------------------------------------------------------------------
+tweepy==4.14.0              # Twitter API v2 client
+praw==7.7.1                 # Reddit API client
+feedparser==6.0.10          # RSS feed parser (news ingestion)
+requests==2.31.0            # HTTP client for API calls
+
+# ---------------------------------------------------------------------------
+# NLP / Text Processing
+# ---------------------------------------------------------------------------
+nltk==3.8.1                 # Tokenization, stopwords, stemming
+spacy==3.7.2                # Named entity recognition, POS tagging
+# Run after install: python -m spacy download en_core_web_sm
+
+# ---------------------------------------------------------------------------
+# Feature Engineering
+# ---------------------------------------------------------------------------
+scipy==1.11.4               # Z-score, statistical tests
+numpy==1.26.2               # Numerical operations
+
+# ---------------------------------------------------------------------------
+# Machine Learning / Prediction
+# ---------------------------------------------------------------------------
+scikit-learn==1.3.2         # RandomForest classifier, IsolationForest, preprocessing
+prophet==1.1.5              # Facebook Prophet time-series forecasting
+# Note: Prophet requires pystan — install may take a few minutes
+
+# ---------------------------------------------------------------------------
+# Kafka (optional streaming)
+# ---------------------------------------------------------------------------
+kafka-python==2.0.2         # Kafka producer/consumer client
+
+# ---------------------------------------------------------------------------
+# MongoDB (optional query layer)
+# ---------------------------------------------------------------------------
+pymongo==4.6.1              # MongoDB Python driver
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+streamlit==1.29.0           # Dashboard framework
+plotly==5.18.0              # Interactive charts
+altair==5.2.0               # Declarative charts (used by Streamlit)
+watchdog==3.0.0             # Streamlit file watcher
+
+# ---------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------
+pytest==7.4.3
+pytest-cov==4.1.0
