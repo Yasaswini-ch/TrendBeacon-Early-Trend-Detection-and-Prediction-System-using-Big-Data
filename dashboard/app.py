@@ -18,6 +18,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 import streamlit as st
+from dashboard.demo_data import load_demo_features, load_demo_predictions, load_demo_trends
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
 try:
@@ -69,14 +70,24 @@ def main() -> None:
     trends_count = _count_parquet_files(_TRENDS_DIR)
     features_count = _count_parquet_files(_FEATURES_DIR)
     preds_count = _count_parquet_files(_PREDICTIONS_DIR)
+    demo_mode = trends_count == 0 and features_count == 0 and preds_count == 0
+    if demo_mode:
+        trends_count = len(load_demo_trends())
+        features_count = len(load_demo_features())
+        preds_count = len(load_demo_predictions())
+
+    if demo_mode:
+        st.info(
+            "Showing bundled demo data because deployed environments do not include generated parquet outputs by default."
+        )
 
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.metric("Trend Files", trends_count)
+        st.metric("Trend Rows" if demo_mode else "Trend Files", trends_count)
     with m2:
-        st.metric("Feature Files", features_count)
+        st.metric("Feature Rows" if demo_mode else "Feature Files", features_count)
     with m3:
-        st.metric("Prediction Files", preds_count)
+        st.metric("Prediction Rows" if demo_mode else "Prediction Files", preds_count)
 
     st.write("")
     col1, col2 = st.columns(2, gap="large")

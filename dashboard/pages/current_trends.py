@@ -24,6 +24,7 @@ from dashboard.components.trend_table import (
     render_metric_cards,
     render_trending_topics_table,
 )
+from dashboard.demo_data import load_demo_trends
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
 _TRENDS_DIR = _PROJECT_ROOT / "data" / "hdfs" / "trends"
@@ -74,6 +75,11 @@ def _load_trends() -> pd.DataFrame | None:
     return df
 
 
+@st.cache_data(show_spinner=False)
+def _load_demo_trends() -> pd.DataFrame:
+    return load_demo_trends()
+
+
 def render_current_trends_page() -> None:
     """Render the full current trends experience."""
     render_navbar("current_trends")
@@ -92,11 +98,10 @@ def render_current_trends_page() -> None:
         df_raw = _load_trends()
 
     if df_raw is None:
+        df_raw = _load_demo_trends()
         st.info(
-            "No trend data was found in `data/hdfs/trends/`. Populate the pipeline output first, "
-            "then refresh this page."
+            "Showing bundled demo trends because no generated parquet files were found in `data/hdfs/trends/`."
         )
-        return
 
     st.markdown("### Signal Filters")
     f1, f2, f3 = st.columns([1.2, 1, 1], gap="large")

@@ -15,6 +15,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.components.trend_chart import plot_forecast, plot_top_trends_bubble
+from dashboard.demo_data import load_demo_features, load_demo_predictions
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
 _PREDICTIONS_DIR = _PROJECT_ROOT / "data" / "hdfs" / "trends" / "predictions"
@@ -79,6 +80,16 @@ def _load_features() -> pd.DataFrame | None:
     return df
 
 
+@st.cache_data(show_spinner=False)
+def _load_demo_predictions() -> pd.DataFrame:
+    return load_demo_predictions()
+
+
+@st.cache_data(show_spinner=False)
+def _load_demo_features() -> pd.DataFrame:
+    return load_demo_features()
+
+
 def _build_summary_table(pred_df: pd.DataFrame) -> pd.DataFrame:
     """Build a ranked per-keyword forecast summary."""
     if pred_df.empty:
@@ -129,8 +140,11 @@ def render_predicted_trends_page() -> None:
         feat_df = _load_features()
 
     if pred_df is None:
-        st.info("No prediction data was found in `data/hdfs/trends/predictions/`.")
-        return
+        pred_df = _load_demo_predictions()
+        feat_df = _load_demo_features()
+        st.info(
+            "Showing bundled demo forecasts because no generated parquet files were found in `data/hdfs/trends/predictions/`."
+        )
 
     st.markdown("### Forecast Controls")
     c1, c2, c3 = st.columns([1, 1.1, 1], gap="large")
