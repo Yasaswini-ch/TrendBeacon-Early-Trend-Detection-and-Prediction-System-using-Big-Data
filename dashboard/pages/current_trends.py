@@ -4,7 +4,12 @@ Streamlit page: Current Trends.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import pandas as pd
 import streamlit as st
@@ -21,7 +26,6 @@ from dashboard.components.trend_table import (
 )
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _TRENDS_DIR = _PROJECT_ROOT / "data" / "hdfs" / "trends"
 
 apply_theme()

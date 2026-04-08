@@ -1,0 +1,1 @@
+"""TrendBeacon Streamlit dashboard package."""

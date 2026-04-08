@@ -9,8 +9,13 @@ The project uses Streamlit's native multipage behavior:
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import streamlit as st
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
@@ -20,7 +25,6 @@ try:
 except Exception:  # noqa: BLE001
     cfg = {"dashboard": {"title": "TrendBeacon"}}
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _TRENDS_DIR = _PROJECT_ROOT / "data" / "hdfs" / "trends"
 _FEATURES_DIR = _PROJECT_ROOT / "data" / "hdfs" / "features"
 _PREDICTIONS_DIR = _TRENDS_DIR / "predictions"
