@@ -282,6 +282,7 @@ def render_navbar(current_page: str) -> None:
         ("/", "Home", "home"),
         ("/current_trends", "Current Trends", "current_trends"),
         ("/predicted_trends", "Predicted Trends", "predicted_trends"),
+        ("/comparison", "Comparison", "comparison"),
     ]
     links_html = "".join(
         [

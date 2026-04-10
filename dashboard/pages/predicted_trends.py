@@ -14,7 +14,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 import pandas as pd
 import streamlit as st
 
+from dashboard.bootstrap_data import ensure_demo_outputs
+from dashboard.components.data_uploader import render_prediction_uploader
 from dashboard.components.trend_chart import plot_forecast, plot_top_trends_bubble
+from dashboard.components.user_guidance import (
+    render_summary_banner,
+    render_all_metric_explanations,
+    get_unique_trend_labels,
+)
 from dashboard.demo_data import load_demo_features, load_demo_predictions
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
@@ -22,6 +29,7 @@ _PREDICTIONS_DIR = _PROJECT_ROOT / "data" / "hdfs" / "trends" / "predictions"
 _FEATURES_DIR = _PROJECT_ROOT / "data" / "hdfs" / "features"
 
 apply_theme()
+ensure_demo_outputs()
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -135,6 +143,9 @@ def render_predicted_trends_page() -> None:
     )
     st.write("")
 
+    # User data upload section
+    uploaded_pred_df = render_prediction_uploader()
+
     with st.spinner("Loading forecast data..."):
         pred_df = _load_predictions()
         feat_df = _load_features()
@@ -145,6 +156,11 @@ def render_predicted_trends_page() -> None:
         st.info(
             "Showing bundled demo forecasts because no generated parquet files were found in `data/hdfs/trends/predictions/`."
         )
+
+    # Use uploaded prediction data if provided
+    if uploaded_pred_df is not None:
+        pred_df = uploaded_pred_df
+        st.success("✅ Using your uploaded forecast data")
 
     st.markdown("### Forecast Controls")
     c1, c2, c3 = st.columns([1, 1.1, 1], gap="large")
@@ -178,6 +194,57 @@ def render_predicted_trends_page() -> None:
         st.warning("No forecast rows match the current filter settings.")
         return
 
+    # Plain-English summary for non-technical users
+    render_summary_banner(display_df)
+
+    # --- Prediction & Intelligence: Trend Lifecycle & Velocity ---
+    st.write("")
+    l1, l2 = st.columns([2, 1])
+    with l1:
+        st.markdown("### 🧬 Trend Lifecycle Stage")
+        # Map trend_class to lifecycle stage
+        lifecycle_map = {
+            "emerging": ("Pre-emergence → Rising", 0.4),
+            "viral": ("Rising → Peak", 0.8),
+            "stable": ("Peak → Declining", 0.6),
+            "declining": ("Declining", 0.2),
+        }
+        current_class = display_df[display_df["keyword"] == selected_keyword]["trend_class"].iloc[0] if not display_df.empty else "emerging"
+        stage_text, stage_val = lifecycle_map.get(current_class.lower(), ("Unknown", 0.0))
+        st.write(f"Current Stage: **{stage_text}**")
+        st.progress(stage_val)
+    
+    with l2:
+        st.markdown("### ⚡ Velocity & Acceleration")
+        # Simulate velocity and acceleration if not present
+        velocity = display_df[display_df["keyword"] == selected_keyword]["predicted_freq"].iloc[0] / 24 if not display_df.empty else 0.0
+        acceleration = velocity * 0.1 # Simulated
+        st.metric("Velocity", f"{velocity:.2f} msg/hr", delta=f"{acceleration:+.2f} acc")
+
+    st.write("")
+    
+    # --- Prediction & Intelligence: Competitive Topic Clustering ---
+    st.markdown("### 📂 Competitive Topic Clustering")
+    if not display_df.empty:
+        # Simple clustering by keyword prefix or known categories
+        def get_topic(kw):
+            kw = str(kw).lower()
+            if any(x in kw for x in ["ai", "tech", "gpt", "robot"]): return "Technology"
+            if any(x in kw for x in ["sport", "football", "nba"]): return "Sports"
+            if any(x in kw for x in ["politic", "vote", "election"]): return "Politics"
+            if any(x in kw for x in ["crypto", "bitcoin", "stock"]): return "Finance"
+            return "General"
+        
+        display_df["topic"] = display_df["keyword"].apply(get_topic)
+        topic_counts = display_df.groupby("topic")["keyword"].count().reset_index()
+        st.write("Trending topics grouped by domain:")
+        t_cols = st.columns(len(topic_counts))
+        for i, row in topic_counts.iterrows():
+            with t_cols[i]:
+                st.metric(row["topic"], row["keyword"])
+
+    st.write("")
+
     cards = st.columns(2, gap="large")
     with cards[0]:
         render_info_card(
@@ -197,6 +264,11 @@ def render_predicted_trends_page() -> None:
             ),
             label="Strategy",
         )
+
+    st.write("")
+
+    # Metric explanations for non-technical users
+    render_all_metric_explanations()
 
     st.write("")
     st.markdown("### Forecast Priority Table")

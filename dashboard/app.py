@@ -18,6 +18,9 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 import streamlit as st
+from dashboard.bootstrap_data import ensure_demo_outputs
+from dashboard.components.data_uploader import render_data_uploader, render_keyword_input
+from dashboard.components.user_guidance import render_all_metric_explanations, render_trend_legend
 from dashboard.demo_data import load_demo_features, load_demo_predictions, load_demo_trends
 from dashboard.theme import apply_theme, render_hero, render_info_card, render_navbar
 
@@ -37,6 +40,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 apply_theme()
+_BOOTSTRAPPED = ensure_demo_outputs()
 
 
 def _count_parquet_files(path: Path) -> int:
@@ -76,9 +80,9 @@ def main() -> None:
         features_count = len(load_demo_features())
         preds_count = len(load_demo_predictions())
 
-    if demo_mode:
+    if _BOOTSTRAPPED:
         st.info(
-            "Showing bundled demo data because deployed environments do not include generated parquet outputs by default."
+            "Generated sample parquet outputs at startup so the deployed dashboard has working data immediately."
         )
 
     m1, m2, m3 = st.columns(3)
@@ -88,6 +92,30 @@ def main() -> None:
         st.metric("Feature Rows" if demo_mode else "Feature Files", features_count)
     with m3:
         st.metric("Prediction Rows" if demo_mode else "Prediction Files", preds_count)
+
+    st.write("")
+
+    # Quick start for users with no data
+    st.markdown("### 🚀 Quick Start")
+    st.caption("No data? Get started in seconds")
+
+    qs1, qs2 = st.columns(2)
+    with qs1:
+        uploaded_df = render_data_uploader()
+        if uploaded_df is not None:
+            st.session_state["uploaded_trend_data"] = uploaded_df
+            st.success("✅ Data uploaded! Navigate to Current Trends to see analysis.")
+    with qs2:
+        keyword_df = render_keyword_input()
+        if keyword_df is not None:
+            st.session_state["uploaded_trend_data"] = keyword_df
+            st.success("✅ Keywords added! Navigate to Current Trends to see analysis.")
+
+    st.write("")
+
+    # Help section for non-technical users
+    render_trend_legend()
+    render_all_metric_explanations()
 
     st.write("")
     col1, col2 = st.columns(2, gap="large")

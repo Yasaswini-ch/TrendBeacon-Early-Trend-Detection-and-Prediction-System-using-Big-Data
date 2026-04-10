@@ -1,174 +1,262 @@
-# TrendBeacon: Early Trend Detection and Prediction System using Big Data
+# TrendBeacon: Early Trend Detection and Prediction System
 
-TrendBeacon is a production-style academic and research project for detecting emerging topics from large-scale text streams before they become fully viral. The system combines ingestion, preprocessing, keyword frequency analysis, growth-rate signals, anomaly detection, forecasting, and dashboard visualization.
+TrendBeacon is a research-style big data project for detecting emerging topics from high-volume text streams before they become fully viral. It combines multi-source ingestion, Spark-based preprocessing, rolling keyword frequency analysis, growth and anomaly signals, forecasting, and a Streamlit dashboard for exploration.
 
-## Project Goal
+## Overview
 
-The system is designed to:
+The project is built to answer a simple question:
 
-1. Collect large-scale data from multiple sources such as Twitter, Reddit, and news feeds.
-2. Store raw and processed data in a Hadoop-style data lake layout.
-3. Process text using Apache Spark and Python.
-4. Detect early trend signals using growth rate and anomaly detection.
-5. Predict future trending topics using time-series forecasting.
-6. Visualize current and predicted trends in a Streamlit dashboard.
+Can we identify a topic while it is still emerging, instead of only after it has already gone viral?
 
-## Core Idea
+TrendBeacon does this by:
+
+1. Ingesting text from Twitter/X, Reddit, and news feeds.
+2. Normalizing records into a shared schema.
+3. Computing keyword frequencies over rolling windows such as `1h`, `6h`, `24h`, and `7d`.
+4. Measuring growth rate, z-score spikes, anomaly signals, and other trend indicators.
+5. Forecasting future keyword momentum.
+6. Displaying current and predicted trends in a Streamlit dashboard.
+
+## What Has Been Used
+
+### Languages and Frameworks
+
+- Python
+- PySpark
+- Streamlit
+- Plotly
+
+### Data and Processing Libraries
+
+- pandas
+- NumPy
+- SciPy
+- scikit-learn
+- PyArrow
+
+### NLP and Text Processing
+
+- NLTK
+- spaCy
+
+### Forecasting and Modeling
+
+- Prophet
+- Isolation Forest style anomaly support
+
+### Data Sources
+
+- Twitter/X API via `tweepy`
+- Reddit API via `praw`
+- RSS/news feeds via `feedparser`
+- Synthetic demo data via `data_ingestion/data_generator.py`
+
+### Storage and Pipeline Style
+
+- Hadoop-style local data lake layout under `data/hdfs/`
+- Parquet outputs for processed, feature, trend, and forecast data
+- Config-driven pipeline behavior via `config/config.yaml`
+
+## How The Project Works
+
+### 1. Ingestion Layer
+
+Modules in [data_ingestion](c:/Opensource/EarlyTrend/data_ingestion) collect data from:
+
+- Twitter/X
+- Reddit
+- News RSS feeds
+- Synthetic generators when API access is not available
+
+The main orchestrator is [data_ingestion/ingest_runner.py](c:/Opensource/EarlyTrend/data_ingestion/ingest_runner.py).
+
+Raw outputs are written into a Hadoop-style folder layout such as:
+
+```text
+data/hdfs/raw/source=twitter/
+data/hdfs/raw/source=reddit/
+data/hdfs/raw/source=news/
+```
+
+### 2. Preprocessing Layer
+
+[data_processing/text_preprocessor.py](c:/Opensource/EarlyTrend/data_processing/text_preprocessor.py) cleans and standardizes the incoming text by:
+
+- normalizing schema
+- cleaning text
+- tokenizing text
+- filtering stopwords and short tokens
+
+The processed output is stored under:
+
+```text
+data/hdfs/processed/
+```
+
+### 3. Frequency Analysis
+
+[data_processing/frequency_analyzer.py](c:/Opensource/EarlyTrend/data_processing/frequency_analyzer.py) converts processed tokens into rolling keyword statistics across multiple windows.
+
+This is where the project starts measuring:
+
+- how often a keyword appears
+- how fast it is growing
+- whether short-term and long-term windows tell different stories
+
+### 4. Trend Detection
+
+[data_processing/trend_detector.py](c:/Opensource/EarlyTrend/data_processing/trend_detector.py) labels keywords using the project’s early-warning logic.
+
+Important signals include:
+
+- frequency
+- growth rate
+- z-score anomaly strength
+- velocity
+- acceleration
+- source diversity
 
 The project distinguishes between:
 
-- Emerging trends: topics showing sustained growth over a longer horizon such as 24 hours.
-- Viral trends: topics showing sudden short-term spikes, often in the 1-hour window.
+- `emerging` trends: gradual and sustained growth, usually stronger in longer windows like `24h`
+- `viral` trends: sudden spikes, usually stronger in short windows like `1h`
+- `stable` and `declining` topics where appropriate
 
-Early detection is based on multiple signals:
-
-- Frequency changes across rolling windows
-- Growth rate
-- Z-score based anomaly intensity
-- Velocity
-- Acceleration
-- Source diversity
-
-## High-Level Architecture
+Trend outputs are written to:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                            DATA SOURCES                             │
-│   Twitter API / Reddit API / News RSS / Kaggle Datasets (simulate)  │
-└─────────────────┬───────────────────────────────────────────────────┘
-                  │ raw JSON/CSV streams
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                       DATA INGESTION LAYER                          │
-│  /data_ingestion                                                    │
-│  ┌───────────────────┐  ┌───────────────────┐  ┌─────────────────┐  │
-│  │ twitter_ingest.py │  │ reddit_ingest.py  │  │ news_ingest.py  │  │
-│  └─────────┬─────────┘  └─────────┬─────────┘  └────────┬────────┘  │
-│            └──────────────────────┬───────────────────────────────┘ │
-│                                   ▼                                 │
-│                     ┌─────────────────────────┐                     │
-│                     │ Kafka (optional)        │                     │
-│                     │ or batch file writer    │                     │
-│                     └────────────┬────────────┘                     │
-└──────────────────────────────────┼──────────────────────────────────┘
-                                   │ raw data
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         STORAGE LAYER (HDFS)                        │
-│  /hdfs_storage                                                      │
-│                                                                     │
-│  hdfs://data/raw/        ← raw ingested data (partitioned by date)  │
-│  hdfs://data/processed/  ← cleaned, normalized data                 │
-│  hdfs://data/features/   ← engineered features                      │
-│  hdfs://data/trends/     ← detected trends output                   │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    PROCESSING LAYER (PySpark)                       │
-│  /data_processing                                                   │
-│                                                                     │
-│  ┌──────────────────────┐   ┌──────────────────────┐                │
-│  │ text_preprocessor.py │   │ keyword_extractor.py │                │
-│  └──────────────────────┘   └──────────────────────┘                │
-│  ┌──────────────────────┐   ┌──────────────────────┐                │ 
-│  │ frequency_analyzer.py│   │ trend_detector.py    │                │
-│  │                      │   │ growth + anomalies   │                │ 
-│  └──────────────────────┘   └──────────────────────┘                │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                   FEATURE ENGINEERING LAYER                         │
-│  /features                                                          │
-│                                                                     │
-│  • Keyword frequency over time windows (1h, 6h, 24h)                │
-│  • Growth Rate = (freq_now - freq_past) / freq_past                 │
-│  • Z-score anomaly detection on frequency spikes                    │
-│  • Velocity and acceleration of keyword mention counts              │
-│  • Sentiment score per keyword cluster                              │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        PREDICTION LAYER                             │
-│  /model                                                             │
-│                                                                     │
-│  ┌──────────────────────┐   ┌──────────────────────┐                │
-│  │ prophet_model.py     │   │ anomaly_detector.py  │                │
-│  │ time-series forecast │   │ IsolationForest/Z    │                │
-│  └──────────────────────┘   └──────────────────────┘                │
-│  ┌──────────────────────┐                                           │ 
-│  │ trend_classifier.py  │  emerging vs viral classifier             │
-│  └──────────────────────┘                                           │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      VISUALIZATION LAYER                            │
-│  /dashboard                                                         │
-│                                                                     │
-│  Streamlit App:                                                     │
-│  • Live trending topics table                                       │
-│  • Predicted trends for next 24h / 7d                               │
-│  • Keyword frequency time-series charts                             │
-│  • Anomaly spike markers on charts                                  │
-│  • Emerging vs Viral trend badges                                   │
-└─────────────────────────────────────────────────────────────────────┘
+data/hdfs/trends/
 ```
 
-## Folder Structure
+### 5. Feature Engineering
+
+[features/feature_builder.py](c:/Opensource/EarlyTrend/features/feature_builder.py) creates model-ready features from frequency and trend outputs.
+
+These features support:
+
+- dashboard summaries
+- anomaly interpretation
+- forecasting inputs
+
+Feature outputs are written to:
 
 ```text
-config/
-dashboard/
-dashboard/pages/
-data/
-data_ingestion/
-data_processing/
-features/
-model/
-tests/
-utils/
-requirements.txt
-README.md
+data/hdfs/features/
+```
+
+### 6. Forecasting
+
+[model/prophet_model.py](c:/Opensource/EarlyTrend/model/prophet_model.py) forecasts future trend intensity for top keywords. The forecasting entrypoint is [model/run_forecasting.py](c:/Opensource/EarlyTrend/model/run_forecasting.py).
+
+Forecast outputs are written to:
+
+```text
+data/hdfs/trends/predictions/
+```
+
+### 7. Dashboard
+
+The Streamlit dashboard lives in [dashboard](c:/Opensource/EarlyTrend/dashboard) and contains:
+
+- [dashboard/app.py](c:/Opensource/EarlyTrend/dashboard/app.py): home page
+- [dashboard/pages/current_trends.py](c:/Opensource/EarlyTrend/dashboard/pages/current_trends.py): current trend monitoring
+- [dashboard/pages/predicted_trends.py](c:/Opensource/EarlyTrend/dashboard/pages/predicted_trends.py): forecast view
+
+The dashboard shows:
+
+- current trending topics
+- trend label distribution
+- growth-rate leaderboards
+- anomaly highlights
+- forecast tables and charts
+
+For deployment-friendly behavior, the dashboard also includes:
+
+- [dashboard/demo_data.py](c:/Opensource/EarlyTrend/dashboard/demo_data.py): bundled sample datasets
+- [dashboard/bootstrap_data.py](c:/Opensource/EarlyTrend/dashboard/bootstrap_data.py): startup generation of sample parquet outputs when real outputs are missing
+
+## High-Level Flow
+
+```text
+Data Sources
+  -> Ingestion
+  -> Preprocessing
+  -> Frequency Analysis
+  -> Trend Detection
+  -> Feature Engineering
+  -> Forecasting
+  -> Streamlit Dashboard
+```
+
+## Project Structure
+
+```text
+TrendBeacon/
+├── config/
+│   ├── config.yaml
+│   ├── config_loader.py
+│   └── logging_config.py
+├── dashboard/
+│   ├── app.py
+│   ├── bootstrap_data.py
+│   ├── demo_data.py
+│   ├── theme.py
+│   ├── components/
+│   │   ├── trend_chart.py
+│   │   └── trend_table.py
+│   └── pages/
+│       ├── current_trends.py
+│       └── predicted_trends.py
+├── data/
+│   └── hdfs/
+│       ├── raw/
+│       ├── processed/
+│       ├── features/
+│       └── trends/
+├── data_ingestion/
+│   ├── data_generator.py
+│   ├── ingest_runner.py
+│   ├── news_ingest.py
+│   ├── reddit_ingest.py
+│   └── twitter_ingest.py
+├── data_processing/
+│   ├── frequency_analyzer.py
+│   ├── keyword_extractor.py
+│   ├── run_pipeline.py
+│   ├── text_preprocessor.py
+│   └── trend_detector.py
+├── features/
+│   ├── feature_builder.py
+│   └── growth_rate.py
+├── model/
+│   ├── anomaly_detector.py
+│   ├── prophet_model.py
+│   └── run_forecasting.py
+├── tests/
+├── utils/
+│   ├── data_validator.py
+│   ├── hdfs_utils.py
+│   ├── schema_definitions.py
+│   └── spark_session.py
+├── requirements.txt
+├── runtime.txt
+└── README.md
 ```
 
 ## Important Modules
 
-- `data_ingestion/ingest_runner.py`
-  Runs all data sources.
+- [config/config.yaml](c:/Opensource/EarlyTrend/config/config.yaml): central project configuration
+- [data_ingestion/data_generator.py](c:/Opensource/EarlyTrend/data_ingestion/data_generator.py): synthetic demo data generation
+- [data_ingestion/ingest_runner.py](c:/Opensource/EarlyTrend/data_ingestion/ingest_runner.py): ingestion orchestrator
+- [data_processing/run_pipeline.py](c:/Opensource/EarlyTrend/data_processing/run_pipeline.py): main batch pipeline
+- [data_processing/trend_detector.py](c:/Opensource/EarlyTrend/data_processing/trend_detector.py): trend labeling logic
+- [features/feature_builder.py](c:/Opensource/EarlyTrend/features/feature_builder.py): feature table creation
+- [model/prophet_model.py](c:/Opensource/EarlyTrend/model/prophet_model.py): forecasting logic
+- [dashboard/app.py](c:/Opensource/EarlyTrend/dashboard/app.py): Streamlit home page
 
-- `data_ingestion/data_generator.py`
-  Generates synthetic datasets for demo mode.
+## Data Layout
 
-- `data_processing/text_preprocessor.py`
-  Normalizes raw source records into a common schema.
-
-- `data_processing/frequency_analyzer.py`
-  Builds rolling keyword frequency windows such as `1h`, `6h`, `24h`, and `7d`.
-
-- `data_processing/trend_detector.py`
-  Computes growth rate, z-score, anomaly flags, velocity, acceleration, and trend labels.
-
-- `features/feature_builder.py`
-  Produces a wide feature table for forecasting and downstream analytics.
-
-- `model/prophet_model.py`
-  Forecasts future trend intensity. Uses Prophet when available and includes fallback behavior.
-
-- `dashboard/app.py`
-  Streamlit home page.
-
-- `dashboard/pages/current_trends.py`
-  Current trend visualization page.
-
-- `dashboard/pages/predicted_trends.py`
-  Predicted trend visualization page.
-
-## Data Storage Layout
-
-The project uses a Hadoop-style directory layout locally:
+The project uses a local Hadoop-style storage layout:
 
 ```text
 data/hdfs/raw/
@@ -176,95 +264,16 @@ data/hdfs/processed/
 data/hdfs/features/
 data/hdfs/trends/
 data/hdfs/trends/predictions/
+data/hdfs/models/
 ```
 
-Even in local demo mode, the layout mirrors what a bigger HDFS deployment would look like.
-
-## Setup
-
-### 1. Create and activate a virtual environment
-
-Windows PowerShell:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-### 2. Install dependencies
-
-```powershell
-pip install -r requirements.txt
-```
-
-## Running the Project
-
-### Demo mode without APIs
-
-The simplest way to run the project is with simulated data.
-
-### 1. Ingest synthetic data
-
-```powershell
-python -m data_ingestion.ingest_runner
-```
-
-### 2. Run processing
-
-```powershell
-python -m data_processing.run_pipeline
-```
-
-### 3. Run forecasting
-
-```powershell
-python -m model.run_forecasting
-```
-
-### 4. Launch Streamlit dashboard
-
-```powershell
-streamlit run dashboard/app.py
-```
-
-## Dashboard Pages
-
-The Streamlit dashboard uses a custom top navbar:
-
-- `Home`: dashboard landing page
-- `Current Trends`: live trend intelligence page
-- `Predicted Trends`: forecast and confidence page
-
-## APIs
-
-You do not need APIs for demo mode.
-
-### Optional APIs for live data
-
-- Twitter/X
-  Set `TWITTER_BEARER_TOKEN`
-
-- Reddit
-  Set `REDDIT_CLIENT_ID`
-  Set `REDDIT_CLIENT_SECRET`
-
-- News
-  RSS feeds can be used without an API key
-
-The current codebase is already configured to work with synthetic data when:
-
-```yaml
-ingestion:
-  simulate: true
-```
+This makes the project feel closer to a real distributed data pipeline, even when running locally.
 
 ## Configuration
 
-Main configuration file:
+The main configuration file is [config/config.yaml](c:/Opensource/EarlyTrend/config/config.yaml).
 
-- `config/config.yaml`
-
-Key sections:
+Important sections:
 
 - `spark`
 - `hdfs`
@@ -273,84 +282,118 @@ Key sections:
 - `features`
 - `models`
 - `dashboard`
+- `logging`
 
-## Research Contributions
+## Setup
 
-This project is suitable for academic, capstone, or research presentation use because it includes:
+### 1. Create a virtual environment
 
-- Big data style pipeline design
-- Trend detection across rolling time windows
-- Growth-rate based early signal detection
-- Z-score based anomaly detection
-- Emerging vs viral trend classification
-- Forecasting of future trend likelihood
-- Dashboard-based explanation and monitoring
+Windows PowerShell:
 
-## Emerging vs Viral Trends
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
-### Emerging
+Git Bash:
 
-- Gradual but statistically meaningful increase
-- Usually more visible in 24-hour windows
-- Strong candidate for early intervention or early insight
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+```
 
-### Viral
+### 2. Install dependencies
 
-- Sharp short-term spike
-- Usually more visible in 1-hour windows
-- Often has higher anomaly intensity
+```powershell
+pip install -r requirements.txt
+```
 
-## Fake vs Organic Trend Detection
+## Running The Project
 
-The current codebase includes the foundation for this idea through:
+### Demo run with synthetic data
 
-- source diversity
-- anomaly intensity
-- cross-source spread
+1. Run ingestion:
 
-Possible future extension:
+```powershell
+python -m data_ingestion.ingest_runner
+```
 
-- low source diversity + very high short-window spike = suspicious amplification
-- high source diversity + steady multi-window growth = organic emerging trend
+2. Run the processing pipeline:
 
-## Current Practical Notes
+```powershell
+python -m data_processing.run_pipeline
+```
 
-### Local Windows mode
+3. Run forecasting:
 
-This project has been adapted to run in local Windows environments, but full Spark + Hadoop filesystem behavior on Windows can still be finicky because of `winutils` and `HADOOP_HOME` behavior.
+```powershell
+python -m model.run_forecasting
+```
 
-To keep the dashboard demonstrable:
+4. Launch the dashboard:
 
-- synthetic raw data is supported
-- local parquet generation is supported
-- the dashboard can be populated even when full Hadoop behavior is not available
+```powershell
+streamlit run dashboard/app.py
+```
 
-### Streamlit behavior
+## Dashboard Pages
 
-If Streamlit is already running and you change code:
+- `Home`: project overview and data status
+- `Current Trends`: active trend board with filters, charts, and anomaly alerts
+- `Predicted Trends`: forecast table, bubble view, and keyword forecast track
 
-1. save files
-2. refresh the browser
-3. restart Streamlit if needed
+## Optional API Configuration
 
-## Suggested Resume Description
+You do not need API keys for demo mode.
 
-Built a Big Data early trend detection and prediction system using Python, PySpark, time-window frequency analysis, anomaly detection, forecasting, and Streamlit dashboarding to identify emerging and viral topics from multi-source social and news data.
+If you want live ingestion, add values in `.env` for:
 
-## Suggested Research Abstract Angle
+- `TWITTER_BEARER_TOKEN`
+- `REDDIT_CLIENT_ID`
+- `REDDIT_CLIENT_SECRET`
 
-This work proposes a scalable early trend detection architecture that combines rolling-window keyword analysis, growth-rate estimation, anomaly detection, and forecasting to identify emerging social and news topics before mainstream viral escalation.
+The project loads environment variables through [config/config_loader.py](c:/Opensource/EarlyTrend/config/config_loader.py).
 
-## Next Improvements
+## Deployment Notes
 
-- full end-to-end Spark pipeline stabilization on Windows
-- stronger forecasting evaluation metrics
-- sentiment analysis enrichment
-- fake vs organic trend classifier
-- Kafka streaming mode
-- Hive or MongoDB query layer
-- model comparison between Prophet, ARIMA, and ML classifiers
+For Streamlit deployment:
+
+- [runtime.txt](c:/Opensource/EarlyTrend/runtime.txt) pins Python `3.11`
+- the dashboard can generate sample parquet outputs on startup
+- if real pipeline outputs are absent, the deployed app still remains usable
+
+## Research Value
+
+This project is suitable for:
+
+- academic mini projects
+- capstone projects
+- research demos
+- portfolio projects focused on big data engineering and trend intelligence
+
+It demonstrates:
+
+- multi-source ingestion
+- Spark-based text processing
+- rolling-window analytics
+- early trend detection
+- anomaly-aware labeling
+- time-series forecasting
+- dashboard-based monitoring
+
+## Suggested Resume Line
+
+Built a big data early trend detection system using Python, PySpark, rolling-window keyword analytics, anomaly signals, forecasting, and Streamlit dashboards to identify emerging and viral topics from multi-source social and news data.
+
+## Future Improvements
+
+- stronger forecast evaluation metrics
+- sentiment enrichment
+- better fake-vs-organic amplification detection
+- true cloud/object storage integration
+- Kafka-driven streaming mode
+- additional forecasting model comparison
 
 ## License
 
-Add your preferred academic or open-source license here.
+Add your preferred open-source or academic-use license here.
